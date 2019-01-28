@@ -1,0 +1,123 @@
+#!/bin/bash
+
+CONFIG_FILE=config.sh
+DEST_FILE=dest.list
+SESSION_FILE=/tmp/tcast.session
+
+# file check
+for file in "$CONFIG_FILE" "$DEST_FILE" ; do
+    if [ ! -f $file ]; then
+        echo "Not found $file"
+        exit 1
+    fi
+done
+
+source $CONFIG_FILE
+
+# tcast session
+LAST_TWEET_ID="0"
+if [ -f $SESSION_FILE ]; then
+    source $SESSION_FILE
+fi
+
+save-session() {
+    cat <<EOM >$SESSION_FILE
+LAST_TWEET_ID=$LAST_TWEET_ID
+EOM
+}
+
+# helpers
+log() {
+    printf "\e[32m[$(date)]\e[0m $@\n"
+}
+
+get() {
+    tw-lock
+    tw-cd $TCAST_TWITTER_USERNAME
+    twurl "$1"
+    tw-lock -u
+}
+
+send-data() {
+    data="$1"
+    log "Send data: $data"
+    cat $DEST_FILE |
+        while read url; do
+            log "Send to $url"
+            curl "$url" --data "$data"
+            RESPONSE=$?
+            if [ $RESPONSE -ne 0 ]; then
+                log "Response from $url is $RESPONSE"
+            fi
+        done
+}
+
+send() {
+    event_type=$1
+    data=$2
+    if [ $# -eq 1 ]; then
+        send-data "{\"event_type\": \"$event_type\"}"
+    elif [ $# -eq 2 ]; then
+        send-data "{\"event_type\": \"$event_type\", \"data\": $data}"
+    fi
+}
+
+# get functions
+get-timeline() {
+    log "GET timeline"
+    get /1.1/statuses/home_timeline.json |
+        jq -cM '.[] | {id:.id_str, username:.user.name, screenname:.user.screen_name, icon:.user.profile_image_url, text:.text}' |
+        while read data; do
+            TWEET_ID="$(echo "$data" | jq -r .id)"
+            if [[ "${TWEET_ID}" > ${LAST_TWEET_ID} ]]; then
+                send update "$data"
+            fi
+            LASLAST_TWEET_ID=$TWEET_ID
+        done
+    send thump
+}
+
+get-mentions() {
+    log "GET mentions"
+    log "Not yet implemented"
+}
+
+get-dms() {
+    log "GET DMs"
+    log "Not yet implemented"
+}
+
+# exit by C-c
+trap "exit" SIGINT SIGTERM
+trap "kill 0" EXIT
+
+# main
+log "Starting tcast (exit by C-c)"
+(
+    while :; do
+        get-timeline
+        sleep "${TCAST_TIMELINE_INTERVAL:-62}"
+    done
+) &
+sleep 1
+(
+    while :; do
+        get-mentions
+        sleep "${TCAST_TIMELINE_INTERVAL:-5}"
+    done
+) &
+sleep 1
+(
+    while :; do
+        get-dms
+        sleep "${TCAST_TIMELINE_INTERVAL:-5}"
+    done
+) &
+(
+    while :; do
+        save-session
+        sleep 30
+    done
+) &
+
+wait
