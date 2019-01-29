@@ -67,7 +67,7 @@ send() {
 get-timeline() {
     log "GET timeline"
     RAW=$(mktemp)
-    get /1.1/statuses/home_timeline.json >$RAW
+    get '/1.1/statuses/home_timeline.json?tweet_mode=extended' >$RAW
     if [ "$(cat $RAW | jq -r 'type')" != array ]; then
         log "Error: $(cat $RAW)"
         rm $RAW
@@ -76,7 +76,7 @@ get-timeline() {
     fi
     TWS=$(mktemp)
     cat $RAW |
-        jq -cM '.[] | {id:.id_str, username:.user.name, screenname:.user.screen_name, icon:.user.profile_image_url, text:.text}' |
+        jq -cM '.[] | {id:.id_str, username:.user.name, screenname:.user.screen_name, icon:.user.profile_image_url, text:.full_text}' |
         tac > $TWS
     cat $TWS |
         while read data; do
