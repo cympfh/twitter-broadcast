@@ -79,6 +79,7 @@ get-timeline() {
         jq -cM '.[] | {id:.id_str, username:.user.name, screenname:.user.screen_name, icon:.user.profile_image_url, text:.full_text}' |
         tac > $TWS
     cat $TWS |
+        sed 's/\\/\\\\/g' |
         while read data; do
             TWEET_ID="$(echo "$data" | jq -r .id)"
             if [[ "${TWEET_ID}" > "${LAST_TWEET_ID}" ]]; then
