@@ -76,7 +76,14 @@ get-timeline() {
     fi
     TWS=$(mktemp)
     cat $RAW |
-        jq -cM '.[] | {id:.id_str, username:.user.name, screenname:.user.screen_name, icon:.user.profile_image_url, text:.full_text}' |
+        jq -cM '.[] | {
+            id:.id_str,
+            username:.user.name,
+            screenname:.user.screen_name,
+            icon:.user.profile_image_url,
+            text:.full_text,
+            entities: .entities
+        }' |
         tac > $TWS
     cat $TWS |
         sed 's/\\/\\\\/g' |
