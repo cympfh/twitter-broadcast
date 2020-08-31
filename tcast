@@ -77,7 +77,9 @@ get-timeline() {
     cat $RAW |
         jq -cM ".[] |
             (if .id > $LAST_TWEET_ID then . else empty end) |
-            (if has(\"quoted_status\") then .quoted_status else . end) |
+            (if has(\"quoted_status\") then .quoted_status
+             elif has(\"retweeted_status\") then .retweeted_status
+             else . end) |
             {
                 id: .id_str,
                 username: .user.name,
